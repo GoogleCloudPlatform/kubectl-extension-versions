@@ -46,7 +46,7 @@ type detectFunc func(context.Context) (bool, error)
 type versionFunc func(context.Context) (versionInfo, error)
 
 type extension struct {
-	name          strin g
+	name          string
 	detectFn      detectFunc
 	versionFn     versionFunc
 	subcomponents []*extension

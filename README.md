@@ -32,7 +32,7 @@ kubectl extension-versions
 
    kubectl extension-versions
 
-## Author
+## Authors
 
 - Ahmet Alp Balkan [(@ahmetb)](https://twitter.com/ahmetb)
 
