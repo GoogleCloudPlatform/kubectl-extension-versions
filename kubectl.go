@@ -61,6 +61,44 @@ func getNamespaces(ctx context.Context) ([]string, error) {
 	return namespaces, errOut
 }
 
+func hasNamespaceWithPrefix(ctx context.Context, prefix string) (bool, error) {
+	ns, err := getNamespaces(ctx)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get namespaces")
+	}
+	for _, n := range ns {
+		if strings.HasPrefix(n, prefix) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func hasNamespace(ctx context.Context, s string) (bool, error) {
+	list, err := getNamespaces(ctx)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get namespaces")
+	}
+	for _, n := range list {
+		if n == s {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func detectByNamespace(ns string) detectFunc {
+	return func(ctx context.Context) (installStatus, error) {
+		ok, err := hasNamespace(ctx, ns)
+		if err != nil {
+			return failed, err
+		} else if ok {
+			return installed, nil
+		}
+		return notFound, nil
+	}
+}
+
 func getPods(ctx context.Context) ([]pod, error) {
 	var errOut error
 	podsLock.Do(func() {
@@ -77,6 +115,32 @@ func getPods(ctx context.Context) ([]pod, error) {
 		podList = v.Items
 	})
 	return podList, errOut
+}
+
+func hasPodsByPrefix(ctx context.Context, namespace, podPrefix string) (bool, error) {
+	pods, err := getPods(ctx)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get pods")
+	}
+	for _, p := range pods {
+		if p.Metadata.Namespace == namespace && strings.HasPrefix(p.Metadata.Name, podPrefix) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func detectByPod(namespace, podPrefix string) detectFunc {
+	return func(ctx context.Context) (installStatus, error) {
+		ok, err := hasPodsByPrefix(ctx, namespace, podPrefix)
+		if err != nil {
+			return failed, err
+		}
+		if ok {
+			return installed, nil
+		}
+		return notFound, nil
+	}
 }
 
 func getPodImageByPrefix(ctx context.Context, namespace, podPrefix, containerName string) (string, error) {

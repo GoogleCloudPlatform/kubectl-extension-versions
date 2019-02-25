@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"strings"
+	"log"
 
 	"github.com/pkg/errors"
 )
@@ -23,44 +23,21 @@ func resolveKnativeComponentVersion(namespace, deployment string) versionFunc {
 		if err != nil {
 			return "", errors.Wrap(err, "failed to determine container image")
 		}
-		return versionInfo(img), nil
+		return versionInfoFromImage(img), nil
 	}
 }
 
-func hasNamespaceWithPrefix(ctx context.Context, prefix string) (bool, error) {
-	ns, err := getNamespaces(ctx)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get namespaces")
-	}
-	for _, n := range ns {
-		if strings.HasPrefix(n, prefix) {
-			return true, nil
+func versionInfoFromImage(image string) versionInfo {
+	// can simplify gcr.io/[img]@sha256:[...] as versioned :tag?
+	if isGCRHash(image) {
+		i, err := resolveGCRHashToTag(image)
+		if err == nil {
+			return versionInfo(i)
 		}
+		log.Printf("WARN: failed to query tags for gcr image: %v", err)
 	}
-	return false, nil
-}
 
-func hasNamespace(ctx context.Context, s string) (bool, error) {
-	list, err := getNamespaces(ctx)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get namespaces")
-	}
-	for _, n := range list {
-		if n == s {
-			return true, nil
-		}
-	}
-	return false, nil
-}
+	// TODO what else?
 
-func detectByNamespace(ns string) detectFunc {
-	return func(ctx context.Context) (installStatus, error) {
-		ok, err := hasNamespace(ctx, ns)
-		if err != nil {
-			return unknown, err
-		} else if ok {
-			return installed, nil
-		}
-		return notFound, nil
-	}
+	return versionInfo(image) // fallback
 }

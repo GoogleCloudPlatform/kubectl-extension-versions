@@ -6,15 +6,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func istioInstalled(ctx context.Context) (installStatus, error) {
-	ok, err := hasNamespace(ctx, "istio-system")
-	if err != nil {
-		return unknown, err
-	} else if ok {
-		return installed, nil
-	}
-	return notFound, nil
-}
+var (
+	istioInstalled = detectByNamespace("istio-system")
+)
 
 func podImageResolver(namespace, podPrefix, containerName string) versionFunc {
 	return func(ctx context.Context) (versionInfo, error) {
@@ -22,6 +16,6 @@ func podImageResolver(namespace, podPrefix, containerName string) versionFunc {
 		if err != nil {
 			return "", errors.Wrap(err, "failed to determine container image")
 		}
-		return versionInfo(img), nil
+		return versionInfoFromImage(img), nil
 	}
 }

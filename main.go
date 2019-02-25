@@ -21,7 +21,7 @@ const (
 var (
 	installStatusLabels = map[installStatus]string{
 		unknown:   "???",
-		notFound:  "N/A",
+		notFound:  "not found",
 		installed: "installed",
 		failed:    "error",
 	}
@@ -29,7 +29,7 @@ var (
 
 type versionInfo string
 
-type detectFunc func(context.Context) (installStatus, error)
+type detectFunc func(context.Context) (installStatus, error) // TODO: this can be (bool,error)?
 type versionFunc func(context.Context) (versionInfo, error)
 
 type extension struct {
@@ -58,17 +58,22 @@ func main() {
 			subcomponents: []*extension{
 				{
 					name:      "pilot",
-					detectFn:  istioInstalled, // TODO more detailed detector
+					detectFn:  detectByPod("istio-system", "istio-pilot-"),
 					versionFn: podImageResolver("istio-system", "istio-pilot", "discovery"),
 				},
 				{
 					name:      "sidecar-injector",
-					detectFn:  istioInstalled, // TODO more detailed detector
+					detectFn:  detectByPod("istio-system", "istio-sidecar-injector-"),
 					versionFn: podImageResolver("istio-system", "istio-sidecar-injector", ""),
 				},
 				{
+					name:      "policy",
+					detectFn:  detectByPod("istio-system", "istio-policy-"),
+					versionFn: podImageResolver("istio-system", "istio-polic1", "mixer"),
+				},
+				{
 					name:      "prometheus",
-					detectFn:  istioInstalled, // TODO more detailed detector
+					detectFn:  detectByPod("istio-system", "prometheus-"),
 					versionFn: podImageResolver("istio-system", "prometheus", "prometheus"),
 				},
 			},
@@ -96,7 +101,7 @@ func main() {
 		},
 	}
 	if err := processExtensions(ctx, extensions); err != nil {
-		log.Fatal(err)
+		log.Printf("WARN: failed to detect some extensions: %v", err)
 	}
 	printStatuses("", extensions)
 }
@@ -109,7 +114,7 @@ func processExtensions(ctx context.Context, extensions []*extension) error {
 		go func(e *extension) {
 			defer wg.Done()
 			if err := processExtension(ctx, e); err != nil {
-				outErr = err
+				outErr = errors.Wrapf(err, "failed to process %q", e.name)
 			}
 		}(ex)
 	}
@@ -122,33 +127,36 @@ func processExtension(ctx context.Context, e *extension) error {
 		return errors.Errorf("extension %q has no detection function", e.name)
 	}
 	status, err := e.detectFn(ctx)
-	e.result = detectResult{
-		status: status,
-		error:  err,
-	}
 	if err != nil {
-		return nil // TODO: we don't return the err, so wanna continue parsing
+		e.result.status = failed
+		e.result.error = err
+		return err // TODO: we don't return the err, so wanna continue processing
 	}
+	e.result.status = status
 
 	if status != installed {
 		return nil
 	}
-	if len(e.subcomponents) == 0 {
-		if e.versionFn == nil {
-			return errors.Errorf("extension %q has no version function", e.name)
-		}
-		version, err := e.versionFn(ctx)
-		e.result.error = err
-		if err != nil {
-			e.result.error = err
-			return err
-		}
-		e.result.version = version
-	} else {
+
+	// process subcomponents if any
+	if len(e.subcomponents) > 0 {
 		if err := processExtensions(ctx, e.subcomponents); err != nil {
-			return errors.Wrapf(err, "failed to process subcomponents of %s", e.name)
+			return errors.Wrapf(err, "failed to process subcomponents of %q", e.name)
 		}
+		return nil
 	}
+
+	if e.versionFn == nil {
+		return errors.Errorf("extension %q has no version function", e.name)
+	}
+	version, err := e.versionFn(ctx)
+	e.result.error = err
+	if err != nil {
+		e.result.status = failed
+		e.result.error = err
+		return err
+	}
+	e.result.version = version
 	return nil
 }
 
@@ -157,12 +165,16 @@ func printStatuses(prefix string, extensions []*extension) {
 		fmt.Printf("%s", prefix)
 		fmt.Printf("- %s: ", e.name)
 		if len(e.subcomponents) == 0 {
+			// leaf component
 			if e.result.status == installed {
 				fmt.Printf("%s", e.result.version)
 			} else if e.result.status == failed {
 				fmt.Printf("%s (%s)", installStatusLabels[e.result.status], e.result.error)
 			} else if e.result.status == unknown {
-				fmt.Printf("%s", installStatusLabels[e.result.status])
+				fmt.Printf("(%s)", installStatusLabels[e.result.status])
+			} else if prefix != "" && e.result.status == notFound {
+				// a subcomponent that's not present
+				fmt.Printf("(%s)", installStatusLabels[e.result.status])
 			}
 		}
 		fmt.Println()
