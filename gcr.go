@@ -24,8 +24,7 @@ import (
 )
 
 var (
-	gcrSHA256Pattern = regexp.MustCompile(`^gcr.io\/.*@sha256:[0-9a-f]{64}$`) // TODO is this redundant given below
-	gcrSHA256Group   = regexp.MustCompile(`^gcr.io\/(.*)@(sha256:[0-9a-f]{64})$`)
+	gcrSHA256Pattern = regexp.MustCompile(`^gcr.io\/(.*)@(sha256:[0-9a-f]{64})$`)
 )
 
 func isGCRHash(image string) bool { return gcrSHA256Pattern.MatchString(image) }
@@ -34,7 +33,7 @@ func isGCRHash(image string) bool { return gcrSHA256Pattern.MatchString(image) }
 // resolved. If no tags are available, an empty string is returned. If multiple
 // tags are available, first one that's not "latest" is returned.
 func resolveGCRHashToTag(image string) (string, error) {
-	groups := gcrSHA256Group.FindStringSubmatch(image)
+	groups := gcrSHA256Pattern.FindStringSubmatch(image)
 	if len(groups) != 3 {
 		return "", errors.Errorf("image %s cannot be parsed into repo/sha (got %d groups)", image, len(groups))
 	}
