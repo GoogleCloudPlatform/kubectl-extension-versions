@@ -61,19 +61,6 @@ func getNamespaces(ctx context.Context) ([]string, error) {
 	return namespaces, errOut
 }
 
-func hasNamespaceWithPrefix(ctx context.Context, prefix string) (bool, error) {
-	ns, err := getNamespaces(ctx)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get namespaces")
-	}
-	for _, n := range ns {
-		if strings.HasPrefix(n, prefix) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func hasNamespace(ctx context.Context, s string) (bool, error) {
 	list, err := getNamespaces(ctx)
 	if err != nil {
@@ -88,14 +75,27 @@ func hasNamespace(ctx context.Context, s string) (bool, error) {
 }
 
 func detectByNamespace(ns string) detectFunc {
-	return func(ctx context.Context) (installStatus, error) {
-		ok, err := hasNamespace(ctx, ns)
-		if err != nil {
-			return failed, err
-		} else if ok {
-			return installed, nil
+	return func(ctx context.Context) (bool, error) {
+		return hasNamespace(ctx, ns)
+	}
+}
+
+func hasNamespaceWithPrefix(ctx context.Context, prefix string) (bool, error) {
+	ns, err := getNamespaces(ctx)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get namespaces")
+	}
+	for _, n := range ns {
+		if strings.HasPrefix(n, prefix) {
+			return true, nil
 		}
-		return notFound, nil
+	}
+	return false, nil
+}
+
+func detectByNamespacePrefix(nsPrefix string) detectFunc {
+	return func(ctx context.Context) (bool, error) {
+		return hasNamespaceWithPrefix(ctx, nsPrefix)
 	}
 }
 
@@ -131,15 +131,8 @@ func hasPodsByPrefix(ctx context.Context, namespace, podPrefix string) (bool, er
 }
 
 func detectByPod(namespace, podPrefix string) detectFunc {
-	return func(ctx context.Context) (installStatus, error) {
-		ok, err := hasPodsByPrefix(ctx, namespace, podPrefix)
-		if err != nil {
-			return failed, err
-		}
-		if ok {
-			return installed, nil
-		}
-		return notFound, nil
+	return func(ctx context.Context) (bool, error) {
+		return hasPodsByPrefix(ctx, namespace, podPrefix)
 	}
 }
 

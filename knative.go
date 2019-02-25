@@ -7,16 +7,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func knativeInstalled(ctx context.Context) (installStatus, error) {
-	ok, err := hasNamespaceWithPrefix(ctx, "knative-")
-	if err != nil {
-		return unknown, err
-	} else if ok {
-		return installed, nil
-	}
-	return notFound, nil
-}
-
 func resolveKnativeComponentVersion(namespace, deployment string) versionFunc {
 	return func(ctx context.Context) (versionInfo, error) {
 		img, err := getPodImageByPrefix(ctx, namespace, deployment+"-", "")

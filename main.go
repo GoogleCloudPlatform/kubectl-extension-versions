@@ -29,7 +29,7 @@ var (
 
 type versionInfo string
 
-type detectFunc func(context.Context) (installStatus, error) // TODO: this can be (bool,error)?
+type detectFunc func(context.Context) (bool, error)
 type versionFunc func(context.Context) (versionInfo, error)
 
 type extension struct {
@@ -54,7 +54,7 @@ func main() {
 	extensions := []*extension{
 		&extension{
 			name:     "istio",
-			detectFn: istioInstalled,
+			detectFn: detectByNamespacePrefix("istio-system"),
 			subcomponents: []*extension{
 				{
 					name:      "pilot",
@@ -69,7 +69,7 @@ func main() {
 				{
 					name:      "policy",
 					detectFn:  detectByPod("istio-system", "istio-policy-"),
-					versionFn: podImageResolver("istio-system", "istio-polic1", "mixer"),
+					versionFn: podImageResolver("istio-system", "istio-policy", "mixer"),
 				},
 				{
 					name:      "prometheus",
@@ -80,7 +80,7 @@ func main() {
 		},
 		&extension{
 			name:     "knative",
-			detectFn: knativeInstalled,
+			detectFn: detectByNamespacePrefix("knative-"),
 			subcomponents: []*extension{
 				&extension{
 					name:      "build",
@@ -126,18 +126,21 @@ func processExtension(ctx context.Context, e *extension) error {
 	if e.detectFn == nil {
 		return errors.Errorf("extension %q has no detection function", e.name)
 	}
-	status, err := e.detectFn(ctx)
+	installStatus, err := e.detectFn(ctx)
 	if err != nil {
 		e.result.status = failed
 		e.result.error = err
 		return err // TODO: we don't return the err, so wanna continue processing
 	}
-	e.result.status = status
-
-	if status != installed {
-		return nil
+	if installStatus {
+		e.result.status = installed
+	} else {
+		e.result.status = notFound
 	}
 
+	if e.result.status != installed {
+		return nil
+	}
 	// process subcomponents if any
 	if len(e.subcomponents) > 0 {
 		if err := processExtensions(ctx, e.subcomponents); err != nil {
