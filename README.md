@@ -21,6 +21,10 @@ kubectl extension-versions
 
 ## Installation
 
+> :warning::warning: These instructions don't work yet. Just `go build` this and
+> place the binary to your `$PATH` as `kubectl-extension_versions` (mind the
+> underscore) to get it to work.
+
 1. Install [krew](https://github.com/GoogleContainerTools/krew) plugin manager
    for kubectl.
 
