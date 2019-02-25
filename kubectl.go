@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -15,7 +16,7 @@ var (
 	namespaces []string
 	nsLock     sync.Once
 
-	pods     []pod
+	podList  []pod
 	podsLock sync.Once
 )
 
@@ -26,6 +27,7 @@ type pod struct {
 	} `json:"metadata"`
 	Spec struct {
 		Containers []struct {
+			Name  string `json:"name"`
 			Image string `json:"image"`
 		} `json:"containers"`
 	} `json:"spec"`
@@ -72,9 +74,38 @@ func getPods(ctx context.Context) ([]pod, error) {
 			errOut = errors.Wrap(err, "decoding json failed")
 			return
 		}
-		pods = v.Items
+		podList = v.Items
 	})
-	return pods, errOut
+	return podList, errOut
+}
+
+func getPodImageByPrefix(ctx context.Context, namespace, podPrefix, containerName string) (string, error) {
+	pods, err := getPods(ctx)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get pods")
+	}
+	var p *pod
+	for _, pp := range pods {
+		if pp.Metadata.Namespace == namespace && strings.HasPrefix(pp.Metadata.Name, podPrefix) {
+			p = &pp
+			break
+		}
+	}
+	if p == nil {
+		return "", errors.Errorf("no pod found with \"%s/%s\" prefix", namespace, podPrefix)
+	}
+	if len(p.Spec.Containers) == 1 {
+		return p.Spec.Containers[0].Image, nil
+	}
+	if containerName == "" {
+		return "", errors.Errorf("pod %s has %d containers, could not disambiguate (containerName filter not given)", p.Metadata.Name, len(p.Spec.Containers))
+	}
+	for _, c := range p.Spec.Containers {
+		if c.Name == containerName {
+			return c.Image, nil
+		}
+	}
+	return "", errors.Errorf("could not find container name %q in pod %s/%s", containerName, p.Metadata.Namespace, p.Metadata.Name)
 }
 
 func execKubectl(ctx context.Context, args ...string) ([]byte, error) {

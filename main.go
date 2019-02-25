@@ -18,6 +18,15 @@ const (
 	failed
 )
 
+var (
+	installStatusLabels = map[installStatus]string{
+		unknown:   "???",
+		notFound:  "N/A",
+		installed: "installed",
+		failed:    "error",
+	}
+)
+
 type versionInfo string
 
 type detectFunc func(context.Context) (installStatus, error)
@@ -44,18 +53,45 @@ func main() {
 
 	extensions := []*extension{
 		&extension{
+			name:     "istio",
+			detectFn: istioInstalled,
+			subcomponents: []*extension{
+				{
+					name:      "pilot",
+					detectFn:  istioInstalled, // TODO more detailed detector
+					versionFn: podImageResolver("istio-system", "istio-pilot", "discovery"),
+				},
+				{
+					name:      "sidecar-injector",
+					detectFn:  istioInstalled, // TODO more detailed detector
+					versionFn: podImageResolver("istio-system", "istio-sidecar-injector", ""),
+				},
+				{
+					name:      "prometheus",
+					detectFn:  istioInstalled, // TODO more detailed detector
+					versionFn: podImageResolver("istio-system", "prometheus", "prometheus"),
+				},
+			},
+		},
+		&extension{
 			name:     "knative",
 			detectFn: knativeInstalled,
 			subcomponents: []*extension{
 				&extension{
-					name:     "build",
-					detectFn: detectByNamespace("knative-build")},
+					name:      "build",
+					detectFn:  detectByNamespace("knative-build"),
+					versionFn: resolveKnativeComponentVersion("knative-build", "build-controller"),
+				},
 				&extension{
-					name:     "serving",
-					detectFn: detectByNamespace("knative-build")},
+					name:      "serving",
+					detectFn:  detectByNamespace("knative-serving"),
+					versionFn: resolveKnativeComponentVersion("knative-serving", "controller"),
+				},
 				&extension{
-					name:     "eventing",
-					detectFn: detectByNamespace("knative-eventing")},
+					name:      "eventing",
+					detectFn:  detectByNamespace("knative-eventing"),
+					versionFn: resolveKnativeComponentVersion("knative-eventing", "eventing-controller"),
+				},
 			},
 		},
 	}
@@ -118,7 +154,19 @@ func processExtension(ctx context.Context, e *extension) error {
 
 func printStatuses(prefix string, extensions []*extension) {
 	for _, e := range extensions {
-		fmt.Printf("%s- %s: %d (%s) (%v)\n", prefix, e.name, e.result.status, e.result.version, e.result.error)
+		fmt.Printf("%s", prefix)
+		fmt.Printf("- %s: ", e.name)
+		if len(e.subcomponents) == 0 {
+			if e.result.status == installed {
+				fmt.Printf("%s", e.result.version)
+			} else if e.result.status == failed {
+				fmt.Printf("%s (%s)", installStatusLabels[e.result.status], e.result.error)
+			} else if e.result.status == unknown {
+				fmt.Printf("%s", installStatusLabels[e.result.status])
+			}
+		}
+		fmt.Println()
+
 		if len(e.subcomponents) > 0 {
 			printStatuses(prefix+"  ", e.subcomponents)
 		}

@@ -17,6 +17,16 @@ func knativeInstalled(ctx context.Context) (installStatus, error) {
 	return notFound, nil
 }
 
+func resolveKnativeComponentVersion(namespace, deployment string) versionFunc {
+	return func(ctx context.Context) (versionInfo, error) {
+		img, err := getPodImageByPrefix(ctx, namespace, deployment+"-", "")
+		if err != nil {
+			return "", errors.Wrap(err, "failed to determine container image")
+		}
+		return versionInfo(img), nil
+	}
+}
+
 func hasNamespaceWithPrefix(ctx context.Context, prefix string) (bool, error) {
 	ns, err := getNamespaces(ctx)
 	if err != nil {
