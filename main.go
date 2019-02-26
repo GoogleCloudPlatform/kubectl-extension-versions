@@ -52,6 +52,7 @@ type detectResult struct {
 }
 
 func main() {
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // TODO implement signal handling and call cancel()
 
@@ -63,22 +64,22 @@ func main() {
 				{
 					name:      "pilot",
 					detectFn:  detectByPod("istio-system", "istio-pilot-"),
-					versionFn: podImageResolver("istio-system", "istio-pilot", "discovery"),
+					versionFn: versionFromDeploymentImage("istio-system", "istio-pilot", "discovery"),
 				},
 				{
 					name:      "sidecar-injector",
 					detectFn:  detectByPod("istio-system", "istio-sidecar-injector-"),
-					versionFn: podImageResolver("istio-system", "istio-sidecar-injector", ""),
+					versionFn: versionFromDeploymentImage("istio-system", "istio-sidecar-injector", ""),
 				},
 				{
 					name:      "policy",
 					detectFn:  detectByPod("istio-system", "istio-policy-"),
-					versionFn: podImageResolver("istio-system", "istio-policy", "mixer"),
+					versionFn: versionFromDeploymentImage("istio-system", "istio-policy", "mixer"),
 				},
 				{
 					name:      "prometheus",
 					detectFn:  detectByPod("istio-system", "prometheus-"),
-					versionFn: podImageResolver("istio-system", "prometheus", "prometheus"),
+					versionFn: versionFromDeploymentImage("istio-system", "prometheus", "prometheus"),
 				},
 			},
 		},
@@ -87,19 +88,19 @@ func main() {
 			detectFn: detectByNamespacePrefix("knative-"),
 			subcomponents: []*extension{
 				&extension{
-					name:      "build",
-					detectFn:  detectByNamespace("knative-build"),
-					versionFn: resolveKnativeComponentVersion("knative-build", "build-controller"),
-				},
-				&extension{
 					name:      "serving",
 					detectFn:  detectByNamespace("knative-serving"),
-					versionFn: resolveKnativeComponentVersion("knative-serving", "controller"),
+					versionFn: versionFromDeploymentImage("knative-serving", "controller", ""),
+				},
+				&extension{
+					name:      "build",
+					detectFn:  detectByNamespace("knative-build"),
+					versionFn: versionFromDeploymentImage("knative-build", "build-controller", ""),
 				},
 				&extension{
 					name:      "eventing",
 					detectFn:  detectByNamespace("knative-eventing"),
-					versionFn: resolveKnativeComponentVersion("knative-eventing", "eventing-controller"),
+					versionFn: versionFromDeploymentImage("knative-eventing", "eventing-controller", ""),
 				},
 			},
 		},
