@@ -31,15 +31,6 @@ const (
 	failed
 )
 
-var (
-	installStatusLabels = map[installStatus]string{
-		unknown:   "???",
-		notFound:  "not found",
-		installed: "installed",
-		failed:    "error",
-	}
-)
-
 type versionInfo string
 
 type detectFunc func(context.Context) (bool, error)
@@ -178,19 +169,17 @@ func processExtension(ctx context.Context, e *extension) error {
 
 func printStatuses(prefix string, extensions []*extension) {
 	for _, e := range extensions {
-		fmt.Printf("%s", prefix)
-		fmt.Printf("- %s: ", e.name)
+		fmt.Printf("%s- %s: ", prefix, e.name)
 		if len(e.subcomponents) == 0 {
-			// leaf component
-			if e.result.status == installed {
-				fmt.Printf("%s", e.result.version)
-			} else if e.result.status == failed {
-				fmt.Printf("%s (%s)", installStatusLabels[e.result.status], e.result.error)
-			} else if e.result.status == unknown {
-				fmt.Printf("(%s)", installStatusLabels[e.result.status])
-			} else if prefix != "" && e.result.status == notFound {
-				// a subcomponent that's not present
-				fmt.Printf("(%s)", installStatusLabels[e.result.status])
+			switch e.result.status {
+			case notFound:
+				fmt.Print("(not installed)")
+			case unknown:
+				fmt.Print("???")
+			case installed:
+				fmt.Print(e.result.version)
+			case failed:
+				fmt.Printf("<error> %s", e.result.error)
 			}
 		}
 		fmt.Println()
