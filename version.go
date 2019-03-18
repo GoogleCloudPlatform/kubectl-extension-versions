@@ -27,7 +27,7 @@ func versionInfoFromImage(image string) versionInfo {
 		if err != nil {
 			log.Printf("WARN: failed to query tags for gcr image: %v", err)
 		} else if i != "" {
-			return versionInfo(image)
+			return versionInfo(i)
 		}
 	}
 	return versionInfo(image) // fallback

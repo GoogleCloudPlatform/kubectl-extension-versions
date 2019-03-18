@@ -174,7 +174,7 @@ func printStatuses(prefix string, extensions []*extension) {
 		if len(e.subcomponents) == 0 {
 			switch e.result.status {
 			case notFound:
-				fmt.Print("(not installed)")
+				fmt.Print("<not installed>")
 			case unknown:
 				fmt.Print("???")
 			case installed:
