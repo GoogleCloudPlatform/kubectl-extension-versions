@@ -104,6 +104,11 @@ func main() {
 				},
 			},
 		},
+		&extension{
+			name:      "helm-tiller",
+			detectFn:  detectByPod("kube-system", "tiller-deploy-"),
+			versionFn: versionFromDeploymentImage("kube-system", "tiller-deploy", "tiller"),
+		},
 	}
 	if err := processExtensions(ctx, extensions); err != nil {
 		log.Printf("WARN: failed to detect some extensions: %v", err)
