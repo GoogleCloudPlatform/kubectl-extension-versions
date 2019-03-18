@@ -173,24 +173,36 @@ func processExtension(ctx context.Context, e *extension) error {
 	return nil
 }
 
+func statusText(r detectResult) string {
+	switch r.status {
+	case installed:
+		return fmt.Sprintf("%s", r.version)
+	case notFound:
+		return "<not installed>"
+	case unknown:
+		return "???"
+	case failed:
+		return fmt.Sprintf("<error>: %s", r.error)
+	default:
+		return "<unhandled status>"
+	}
+}
+
 func printStatuses(prefix string, extensions []*extension) {
 	for _, e := range extensions {
-		fmt.Printf("%s- %s: ", prefix, e.name)
 		if len(e.subcomponents) == 0 {
-			switch e.result.status {
-			case notFound:
-				fmt.Print("<not installed>")
-			case unknown:
-				fmt.Print("???")
-			case installed:
-				fmt.Print(e.result.version)
-			case failed:
-				fmt.Printf("<error> %s", e.result.error)
+			// leaf component
+			fmt.Printf("%s- %s: %s", prefix, e.name, statusText(e.result))
+		} else {
+			// non-leaf component (if installed, do not print install status)
+			fmt.Printf("%s- %s:", prefix, e.name)
+			if e.result.status != installed {
+				fmt.Printf(" %s", statusText(e.result))
 			}
 		}
 		fmt.Println()
 
-		if len(e.subcomponents) > 0 {
+		if e.result.status == installed && len(e.subcomponents) > 0 {
 			printStatuses(prefix+"  ", e.subcomponents)
 		}
 	}
